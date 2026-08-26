@@ -168,7 +168,7 @@ Built as a frontend interface for the OptiImage compression API.
 
 ## 🤝 Related
 
-- [OptiImage Server](https://github.com/YOUR_USERNAME/optiimage-server) — The backend API that powers this frontend
+- [OptiImage Server](https://github.com/MyBaida/optiimage-server) — The backend API that powers this frontend
 
 ---
 
