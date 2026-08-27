@@ -20,7 +20,10 @@ export default function UploadZone({ files, setFiles, error, setError, onPreview
     const fileArr = Array.from(newFiles);
 
     for (const file of fileArr) {
-      if (!ACCEPTED_TYPES.includes(file.type)) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const isHeicExt = ext === 'heic' || ext === 'heif';
+
+      if (!ACCEPTED_TYPES.includes(file.type) && !isHeicExt) {
         setError(`"${file.name}" is not a supported format. Use JPG, PNG, WebP, or HEIC.`);
         return;
       }
