@@ -30,6 +30,12 @@ function App() {
   const [progressSteps, setProgressSteps] = useState([]);
   const timersRef = useRef([]);
   const [previewFile, setPreviewFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const handlePreview = (file, heicUrl) => {
+    setPreviewFile(file);
+    setPreviewUrl(heicUrl || null);
+  };
 
   const totalOriginalSize = files.reduce((sum, f) => sum + f.size, 0);
 
@@ -184,7 +190,7 @@ function App() {
                 setFiles={setFiles}
                 error={uploadError}
                 setError={setUploadError}
-                onPreview={setPreviewFile}
+                onPreview={handlePreview}
               />
 
               {/* Feature strip — visible before files are uploaded */}
@@ -274,9 +280,9 @@ function App() {
       {/* Image preview lightbox */}
       {previewFile && (
         <ImagePreview
-          src={URL.createObjectURL(previewFile)}
+          src={previewUrl || URL.createObjectURL(previewFile)}
           alt={previewFile.name}
-          onClose={() => setPreviewFile(null)}
+          onClose={() => { setPreviewFile(null); setPreviewUrl(null); }}
         />
       )}
 

@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import heic2any from 'heic2any';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 const MAX_FILES = 10;
@@ -17,7 +18,29 @@ function formatSize(bytes) {
 
 export default function UploadZone({ files, setFiles, error, setError, onPreview }) {
   const [isDragging, setIsDragging] = useState(false);
+  const [heicPreviews, setHeicPreviews] = useState({});
   const inputRef = useRef(null);
+
+  // Convert HEic files to JPEG for browser preview
+  useEffect(() => {
+    const urls = {};
+    files.forEach(async (file, index) => {
+      if (isHeicFile(file) && !heicPreviews[index]) {
+        try {
+          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.7 });
+          urls[index] = URL.createObjectURL(converted);
+        } catch {
+          // conversion failed — placeholder will show
+        }
+      }
+    });
+    if (Object.keys(urls).length) {
+      setHeicPreviews((prev) => ({ ...prev, ...urls }));
+    }
+    return () => {
+      Object.values(urls).forEach(URL.revokeObjectURL);
+    };
+  }, [files]);
 
   const validateAndAdd = useCallback((newFiles) => {
     setError('');
@@ -165,10 +188,16 @@ export default function UploadZone({ files, setFiles, error, setError, onPreview
               >
                 {/* Clickable image area for preview */}
                 <div
-                  className={`aspect-square flex items-center justify-center p-2 ${isHeicFile(file) ? 'cursor-default' : 'cursor-zoom-in'}`}
-                  onClick={() => !isHeicFile(file) && onPreview && onPreview(file)}
+                  className="aspect-square flex items-center justify-center p-2 cursor-zoom-in"
+                  onClick={() => onPreview && onPreview(file, heicPreviews[index])}
                 >
-                  {isHeicFile(file) ? (
+                  {isHeicFile(file) && heicPreviews[index] ? (
+                    <img
+                      src={heicPreviews[index]}
+                      alt={file.name}
+                      className="w-full h-full object-contain rounded-lg"
+                    />
+                  ) : isHeicFile(file) ? (
                     <div className="flex flex-col items-center gap-1.5">
                       <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
