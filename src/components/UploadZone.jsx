@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import heic2any from 'heic2any';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -10,6 +10,11 @@ function isHeicFile(file) {
   return ext === 'heic' || ext === 'heif' || file.type === 'image/heic' || file.type === 'image/heif';
 }
 
+async function convertHeicToJpeg(file) {
+  const jpegBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+  return new File([Array.isArray(jpegBlob) ? jpegBlob[0] : jpegBlob], file.name, { type: 'image/jpeg' });
+}
+
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -18,29 +23,8 @@ function formatSize(bytes) {
 
 export default function UploadZone({ files, setFiles, error, setError, onPreview }) {
   const [isDragging, setIsDragging] = useState(false);
-  const [heicPreviews, setHeicPreviews] = useState({});
+  const [isConverting, setIsConverting] = useState(false);
   const inputRef = useRef(null);
-
-  // Convert HEic files to JPEG for browser preview
-  useEffect(() => {
-    const urls = {};
-    files.forEach(async (file, index) => {
-      if (isHeicFile(file) && !heicPreviews[index]) {
-        try {
-          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.7 });
-          urls[index] = URL.createObjectURL(converted);
-        } catch {
-          // conversion failed — placeholder will show
-        }
-      }
-    });
-    if (Object.keys(urls).length) {
-      setHeicPreviews((prev) => ({ ...prev, ...urls }));
-    }
-    return () => {
-      Object.values(urls).forEach(URL.revokeObjectURL);
-    };
-  }, [files]);
 
   const validateAndAdd = useCallback((newFiles) => {
     setError('');
@@ -82,19 +66,39 @@ export default function UploadZone({ files, setFiles, error, setError, onPreview
     setIsDragging(false);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = async (e) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files.length) {
-      validateAndAdd(e.dataTransfer.files);
+      await processFiles(e.dataTransfer.files);
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = async (e) => {
     if (e.target.files.length) {
-      validateAndAdd(e.target.files);
+      await processFiles(e.target.files);
     }
     e.target.value = '';
+  };
+
+  const processFiles = async (rawFiles) => {
+    const fileArr = Array.from(rawFiles);
+    const heicFiles = fileArr.filter(isHeicFile);
+    const normalFiles = fileArr.filter(f => !isHeicFile(f));
+
+    if (heicFiles.length > 0) {
+      setIsConverting(true);
+      try {
+        const converted = await Promise.all(heicFiles.map(convertHeicToJpeg));
+        validateAndAdd([...normalFiles, ...converted]);
+      } catch {
+        setError('Failed to convert HEIC image. Please try a different file.');
+      } finally {
+        setIsConverting(false);
+      }
+    } else {
+      validateAndAdd(fileArr);
+    }
   };
 
   const removeFile = (index) => {
@@ -145,11 +149,13 @@ export default function UploadZone({ files, setFiles, error, setError, onPreview
         </svg>
 
         <p className="text-charcoal font-semibold text-base mb-1">
-          {isDragging ? 'Drop your images here' : 'Drag & drop images here'}
+          {isConverting ? 'Processing images...' : isDragging ? 'Drop your images here' : 'Drag & drop images here'}
         </p>
-        <p className="text-gray-400 text-sm">
-          or <span className="text-opti-blue font-medium">click to browse</span>
-        </p>
+        {!isConverting && (
+          <p className="text-gray-400 text-sm">
+            or <span className="text-opti-blue font-medium">click to browse</span>
+          </p>
+        )}
         <p className="text-gray-400 text-xs mt-3">
           JPG, PNG, WebP, HEIC &middot; Max 10 files &middot; 10MB each
         </p>
@@ -189,29 +195,13 @@ export default function UploadZone({ files, setFiles, error, setError, onPreview
                 {/* Clickable image area for preview */}
                 <div
                   className="aspect-square flex items-center justify-center p-2 cursor-zoom-in"
-                  onClick={() => onPreview && onPreview(file, heicPreviews[index])}
+                  onClick={() => onPreview && onPreview(file)}
                 >
-                  {isHeicFile(file) && heicPreviews[index] ? (
-                    <img
-                      src={heicPreviews[index]}
-                      alt={file.name}
-                      className="w-full h-full object-contain rounded-lg"
-                    />
-                  ) : isHeicFile(file) ? (
-                    <div className="flex flex-col items-center gap-1.5">
-                      <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">HEIC</span>
-                    </div>
-                  ) : (
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={file.name}
-                      className="w-full h-full object-contain rounded-lg"
-                    />
-                  )}
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="w-full h-full object-contain rounded-lg"
+                  />
                 </div>
                 <div className="px-2 pb-2">
                   <p className="text-xs text-charcoal font-medium truncate">{file.name}</p>
