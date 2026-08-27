@@ -4,6 +4,11 @@ const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', '
 const MAX_FILES = 10;
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
+function isHeicFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  return ext === 'heic' || ext === 'heif' || file.type === 'image/heic' || file.type === 'image/heif';
+}
+
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -160,14 +165,24 @@ export default function UploadZone({ files, setFiles, error, setError, onPreview
               >
                 {/* Clickable image area for preview */}
                 <div
-                  className="aspect-square flex items-center justify-center p-2 cursor-zoom-in"
-                  onClick={() => onPreview && onPreview(file)}
+                  className={`aspect-square flex items-center justify-center p-2 ${isHeicFile(file) ? 'cursor-default' : 'cursor-zoom-in'}`}
+                  onClick={() => !isHeicFile(file) && onPreview && onPreview(file)}
                 >
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt={file.name}
-                    className="w-full h-full object-contain rounded-lg"
-                  />
+                  {isHeicFile(file) ? (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">HEIC</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={file.name}
+                      className="w-full h-full object-contain rounded-lg"
+                    />
+                  )}
                 </div>
                 <div className="px-2 pb-2">
                   <p className="text-xs text-charcoal font-medium truncate">{file.name}</p>
